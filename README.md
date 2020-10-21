@@ -42,7 +42,7 @@ GLOBAL OPTIONS:
 ```yaml
 build:
   buildtype: smartVision # 项目编译类型，会自动生成
-  excludes: # 不是监听的目录
+  excludes: # 排除监听的目录
   - .gradle
   - .idea
   - gradle
