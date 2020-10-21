@@ -6,6 +6,9 @@
   - [配置过程](https://openharmony.gitee.com/openharmony/docs/blob/master/kernel/NFS.md)
   - [配置过程可能遇到的问题](https://openharmony.gitee.com/openharmony/docs/issues/I1YIBO)
 - serial(串口)
+- dev tools (可以从鸿蒙编译目录`/out/ipcamera_hi3516dv300/dev_tools/bin`复制到nfs挂载目录)
+  - aa
+  - bm
 
 ### USAGE
 
