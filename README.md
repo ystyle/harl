@@ -32,7 +32,7 @@ GLOBAL OPTIONS:
    --help, -h     show help (default: false)
    --version, -v  print the version (default: false)
 ```
-
+- [下载应用](https://gitee.com/ystyle/harl/releases)
 - `cd /your-project-dir` 切换到项目目录
 - `harl init` 初始化配置文件
 - `harl w` 监听项目文件修改
