@@ -21,7 +21,7 @@ USAGE:
    harl [global options] command [command options] [arguments...]
 
 VERSION:
-   v0.1.1
+   v0.1.2
 
 COMMANDS:
    init, i    init .harm.yml
@@ -40,7 +40,7 @@ GLOBAL OPTIONS:
 - [下载应用](https://gitee.com/ystyle/harl/releases)
 - `cd /your-project-dir` 切换到项目目录
 - `harl init` 初始化配置文件
-- `harl w` 监听项目文件修改
+- `harl w` 监听项目文件修改, 可以输入命令(若看不到提示符请在高度日志暂停打印时按回车)
 - 目前命令只支持在项目目录执行
 
 ### 配置文件
