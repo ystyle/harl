@@ -1,11 +1,13 @@
 package serial
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/tarm/serial"
 	"io"
 	"log"
+	"time"
 )
 
 type Serial struct {
@@ -40,16 +42,32 @@ func (s *Serial) IsConnected() error {
 	return nil
 }
 
-func (s *Serial) Send(msg []byte) {
+func (s *Serial) Send(msg string) {
 	command := fmt.Sprintf("%s \n", msg)
 	s.port.Write([]byte(command))
 }
 
-func (s *Serial) Read() ([]byte, error) {
+func (s *Serial) Read() string {
 	buffer := make([]byte, 1024)
-	n, err := s.port.Read(buffer)
-	if err == io.EOF {
-		return nil, err
+	var buff bytes.Buffer
+	for {
+		time.Sleep(time.Millisecond * 100)
+		n, err := s.port.Read(buffer)
+		if err == io.EOF {
+			break
+		}
+		buff.Write(buffer[:n])
+		if n == 1024 {
+			continue
+		}
+		if n < 1024 {
+			break
+		}
 	}
-	return buffer[0:n], nil
+
+	return buff.String()
+}
+
+func (s *Serial) Close() {
+	s.port.Close()
 }

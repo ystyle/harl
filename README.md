@@ -13,24 +13,29 @@
 ### USAGE
 
 ```shell
-E:\Code\Go\harl>harl.exe -h
+E:\Code\Go\harl>harl
 NAME:
-   harl - Open Harmony OS APP auto reload tool
+   harl - Open Harmony OS Dev tools
 
 USAGE:
-   harl.exe [global options] command [command options] [arguments...]
+   harl [global options] command [command options] [arguments...]
 
 VERSION:
-   v0.0.1
+   v0.1.1
 
 COMMANDS:
-   init, i   init .harm.yml
-   watch, w  watch and reload app
-   help, h   Shows a list of commands or help for one command
+   init, i    init .harm.yml
+   watch, w   watch and reload app
+   install    install hap
+   uninstall  uninstall hap
+   shell      open a shell
+   reboot     reboot
+   help, h    Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
    --help, -h     show help (default: false)
    --version, -v  print the version (default: false)
+
 ```
 - [下载应用](https://gitee.com/ystyle/harl/releases)
 - `cd /your-project-dir` 切换到项目目录

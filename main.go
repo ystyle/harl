@@ -2,10 +2,8 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"github.com/buger/jsonparser"
-	"github.com/gorilla/websocket"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v2"
 	"harl/model"
@@ -14,73 +12,41 @@ import (
 	"harl/watcher"
 	"io/ioutil"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
 	"time"
 )
 
 var (
-	ws   *websocket.Conn // websocket connect
-	ldir string          // local nfs mounted dir
-	rdir string          // remote nfs mounted dir
+	s      *serial.Serial
+	config model.Config
 )
 
 func main() {
 	app := &cli.App{
 		Name:  "harl",
 		Usage: "Open Harmony OS Dev tools",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "serial",
-				Aliases: []string{"s"},
-				Usage:   "serial port",
-			},
-		},
 		Before: func(c *cli.Context) error {
-			switch c.Args().First() {
-			case "init", "i", "daemon", "connect":
-				return nil
-			case "disconnect", "reboot", "shell", "watch", "w", "uninstall", "install":
-				// connect ws
-				fmt.Println(c.Args().First())
-				u := url.URL{Scheme: "ws", Host: "localhost:1614", Path: "/"}
-				conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
-				if err != nil {
-					panic(err)
-				}
-				ws = conn
-				// long connect
-				switch c.Args().First() {
-				case "shell", "watch", "w":
-					go Read()
-				}
-				switch c.Args().First() {
-				case "install", "uninstall":
-					SendAndRead("[config]")
-				}
-			default:
+			if c.Args().First() == "init" || c.Args().Len() == 0 {
 				return nil
 			}
+			config = model.ReadConfig()
+			s = serial.New(config.Reload.Com)
+			s.IsConnected()
 			return nil
 		},
 		Commands: []*cli.Command{
 			Init(),
-			connect(),
-			disconnect(),
 			watch(),
 			install(),
 			uninstall(),
 			shell(),
 			reboot(),
-			daemon(),
 		},
-		After: func(context *cli.Context) error {
-			if ws != nil {
-				ws.Close()
+		After: func(c *cli.Context) error {
+			if s != nil {
+				s.Close()
 			}
 			return nil
 		},
@@ -92,39 +58,18 @@ func main() {
 	}
 }
 
-func Send(msg string) {
-	ws.WriteMessage(websocket.TextMessage, []byte(msg))
-}
-
-func SendAndRead(msg string) {
-	ws.WriteMessage(websocket.TextMessage, []byte(msg))
-	readLine()
-}
-
-func Read() {
-	for {
-		readLine()
+func sendAndRead(msg string) {
+	fmt.Println("command>", msg)
+	s.Send(msg)
+	out := s.Read()
+	if out != "" {
+		fmt.Print(out)
 	}
 }
 
-func readLine() {
-	_, message, err := ws.ReadMessage()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	msg := string(message)
-	if strings.HasPrefix(msg, "config:") {
-		fmt.Println("config: ", msg)
-		config := strings.ReplaceAll(msg, "config:", "")
-		dirs := strings.Split(config, "|")
-		fmt.Println(dirs)
-		ldir = dirs[0]
-		rdir = dirs[1]
-		fmt.Println(ldir, rdir)
-	} else {
-		fmt.Printf("%s", message)
-	}
+func send(msg string) {
+	fmt.Println("command>", msg)
+	s.Send(msg)
 }
 
 func Init() *cli.Command {
@@ -201,7 +146,7 @@ func watch() *cli.Command {
 		Aliases: []string{"w"},
 		Usage:   "watch and reload app",
 		Action: func(c *cli.Context) error {
-			config := model.ReadConfig()
+			fmt.Println("start watch")
 			w := watcher.New(config)
 			go w.Watcher()
 			for {
@@ -227,150 +172,20 @@ func watch() *cli.Command {
 						utils.Copy(path.Join(config.Build.Project, form), path.Join(config.Build.Nfsdir, hap))
 						// install
 						fmt.Println("install...")
-						Send(fmt.Sprintf("cd %s", config.Reload.Dir))
-						Send(fmt.Sprintf("./bm set -s disable"))
-						Send(fmt.Sprintf("./bm set -d enable"))
-						Send(fmt.Sprintf("./bm install -p %s", hap))
-
+						send(fmt.Sprintf("cd %s", config.Reload.Dir))
+						send(fmt.Sprintf("./bm set -s disable"))
+						send(fmt.Sprintf("./bm set -d enable"))
+						time.Sleep(time.Second * 1)
+						send(fmt.Sprintf("./bm install -p %s", hap))
 						// start app
 						fmt.Println("start...")
-						Send(fmt.Sprintf("./aa start -p %s -n %s", config.Reload.BundleName, config.Reload.AbilityName))
+						time.Sleep(time.Second * 1)
+						send(fmt.Sprintf("./aa start -p %s -n %s", config.Reload.BundleName, config.Reload.AbilityName))
 					default:
 						fmt.Println("unknow operation", event)
 					}
 				}
 			}
-			return nil
-		},
-	}
-}
-
-func connect() *cli.Command {
-	return &cli.Command{
-		Name:  "connect",
-		Usage: "conect with serial",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "serial",
-				Aliases: []string{"s"},
-				Usage:   "serial port",
-			},
-			&cli.StringFlag{
-				Name:    "local",
-				Aliases: []string{"ldir", "l"},
-				Usage:   "local nfs mounted dir",
-			},
-			&cli.StringFlag{
-				Name:    "remote",
-				Aliases: []string{"rdir", "r"},
-				Usage:   "remote nfs mounted dir",
-			},
-		},
-		Action: func(c *cli.Context) error {
-			// config form file
-			s := c.String("serial")
-			l := c.String("local")
-			r := c.String("remote")
-			if exists, _ := utils.IsExists(".harl.yaml"); exists {
-				config := model.ReadConfig()
-				s = config.Reload.Com
-				l = config.Build.Nfsdir
-				r = config.Reload.Dir
-			}
-			// config form args
-			if s == "" || l == "" || r == "" {
-				return errors.New("command needs enough arguments")
-			}
-			args := []string{
-				"daemon",
-				"-s", s,
-				"-l", l,
-				"-r", r,
-			}
-			cmd := exec.Command(os.Args[0], args...)
-			return cmd.Start()
-		},
-	}
-}
-
-func daemon() *cli.Command {
-	return &cli.Command{
-		Name:  "daemon",
-		Usage: "run harl daemon",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "serial",
-				Aliases:  []string{"s"},
-				Usage:    "serial port",
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:     "local",
-				Aliases:  []string{"ldir", "l"},
-				Usage:    "local nfs mounted dir",
-				Required: true,
-			},
-			&cli.StringFlag{
-				Name:     "remote",
-				Aliases:  []string{"rdir", "r"},
-				Usage:    "remote nfs mounted dir",
-				Required: true,
-			},
-		},
-		Action: func(c *cli.Context) error {
-			ldir = c.String("local")
-			rdir = c.String("remote")
-			s := serial.New(c.String("serial"))
-			err := s.IsConnected()
-			if err != nil {
-				return err
-			}
-			fmt.Println("connected.")
-			var upgrader = websocket.Upgrader{} // use default options
-			http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-				c, err := upgrader.Upgrade(w, r, nil)
-				if err != nil {
-					log.Print("upgrade:", err)
-					return
-				}
-				defer c.Close()
-				go func() {
-					for {
-						bs, err := s.Read()
-						if err != nil {
-							continue
-						}
-						fmt.Printf("%s", bs)
-						err = c.WriteMessage(websocket.TextMessage, bs)
-						if err != nil {
-							fmt.Print(err)
-						}
-						time.Sleep(time.Millisecond * 200)
-					}
-				}()
-				for {
-					_, message, err := c.ReadMessage()
-					if err != nil {
-						log.Println("read:", err)
-						break
-					}
-					log.Printf("recv: %s", message)
-					if string(message) == "[config]" {
-						config := fmt.Sprintf("config:%s|%s", ldir, rdir)
-						err = c.WriteMessage(websocket.TextMessage, []byte(config))
-						if err != nil {
-							log.Println("read:", err)
-							return
-						}
-						continue
-					}
-					if string(message) == "[ws close]" {
-						os.Exit(0)
-					}
-					s.Send(message)
-				}
-			})
-			log.Fatal(http.ListenAndServe(":1614", nil))
 			return nil
 		},
 	}
@@ -383,7 +198,7 @@ func shell() *cli.Command {
 		Action: func(c *cli.Context) error {
 			if c.Args().Len() > 0 {
 				commang := strings.Join(c.Args().Slice(), " ")
-				Send(commang)
+				sendAndRead(commang)
 				return nil
 			}
 			reader := bufio.NewReader(os.Stdin)
@@ -394,19 +209,8 @@ func shell() *cli.Command {
 				if msg == "quit" {
 					os.Exit(0)
 				}
-				Send(msg)
+				sendAndRead(msg)
 			}
-			return nil
-		},
-	}
-}
-
-func disconnect() *cli.Command {
-	return &cli.Command{
-		Name:  "disconnect",
-		Usage: "close daemon sever",
-		Action: func(c *cli.Context) error {
-			ws.WriteMessage(websocket.TextMessage, []byte("[ws close]"))
 			return nil
 		},
 	}
@@ -417,7 +221,7 @@ func reboot() *cli.Command {
 		Name:  "reboot",
 		Usage: "reboot",
 		Action: func(c *cli.Context) error {
-			ws.WriteMessage(websocket.TextMessage, []byte("reset"))
+			send("reset")
 			return nil
 		},
 	}
@@ -427,30 +231,21 @@ func install() *cli.Command {
 	return &cli.Command{
 		Name:  "install",
 		Usage: "install hap",
-		Flags: []cli.Flag{
-			&cli.PathFlag{
-				Name:     "path",
-				Aliases:  []string{"p"},
-				Usage:    "hap path",
-				Required: true,
-			},
-		},
 		Action: func(c *cli.Context) error {
-			form := c.Path("path")
-			fmt.Println(form)
+			form := c.Args().First()
 			t := time.Now().Format("20060102-150405")
 			hap := fmt.Sprintf("hap-%s.hap", t)
-			lhap := path.Join(ldir, hap)
+			lhap := path.Join(config.Build.Nfsdir, hap)
 			_, err := utils.Copy(form, lhap)
 			if err != nil {
 				return err
 			}
-			time.Sleep(time.Second * 1)
 			fmt.Println("install...")
-			SendAndRead(fmt.Sprintf("cd %s", rdir))
-			SendAndRead(fmt.Sprintf("./bm set -s disable"))
-			SendAndRead(fmt.Sprintf("./bm set -d enable"))
-			SendAndRead(fmt.Sprintf("./bm install -p %s", hap))
+			send(fmt.Sprintf("cd %s", config.Reload.Dir))
+			send(fmt.Sprintf("./bm set -s disable"))
+			send(fmt.Sprintf("./bm set -d enable"))
+			time.Sleep(time.Second * 1)
+			send(fmt.Sprintf("./bm install -p %s", hap))
 			return nil
 		},
 	}
@@ -460,18 +255,10 @@ func uninstall() *cli.Command {
 	return &cli.Command{
 		Name:  "uninstall",
 		Usage: "uninstall hap",
-		Flags: []cli.Flag{
-			&cli.PathFlag{
-				Name:     "bundlename",
-				Aliases:  []string{"n"},
-				Usage:    "hap bundlename",
-				Required: true,
-			},
-		},
 		Action: func(c *cli.Context) error {
-			cmd := fmt.Sprintf("cd %s", rdir)
-			SendAndRead(cmd)
-			SendAndRead(fmt.Sprintf("./bm uninstall -n %s", c.String("bundlename")))
+			cmd := fmt.Sprintf("cd %s", config.Reload.Dir)
+			send(cmd)
+			send(fmt.Sprintf("./bm uninstall -n %s", c.Args().First()))
 			return nil
 		},
 	}
