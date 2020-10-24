@@ -149,6 +149,25 @@ func watch() *cli.Command {
 			fmt.Println("start watch")
 			w := watcher.New(config)
 			go w.Watcher()
+			go func() {
+				for {
+					out := s.Read()
+					if out != "" {
+						fmt.Print(out)
+					}
+				}
+			}()
+			go func() {
+				reader := bufio.NewReader(os.Stdin)
+				for {
+					line, _, _ := reader.ReadLine()
+					msg := string(line)
+					if msg == "quit" {
+						os.Exit(0)
+					}
+					s.Send(msg)
+				}
+			}()
 			for {
 				select {
 				case event := <-w.Event:
