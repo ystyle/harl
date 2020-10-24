@@ -41,6 +41,7 @@ GLOBAL OPTIONS:
 - `cd /your-project-dir` 切换到项目目录
 - `harl init` 初始化配置文件
 - `harl w` 监听项目文件修改
+- 目前命令只支持在项目目录执行
 
 ### 配置文件
 >.harl.yaml

@@ -203,13 +203,21 @@ func shell() *cli.Command {
 			}
 			reader := bufio.NewReader(os.Stdin)
 			fmt.Println("input quit to exit")
+			go func() {
+				for {
+					out := s.Read()
+					if out != "" {
+						fmt.Print(out)
+					}
+				}
+			}()
 			for {
 				line, _, _ := reader.ReadLine()
 				msg := string(line)
 				if msg == "quit" {
 					os.Exit(0)
 				}
-				sendAndRead(msg)
+				s.Send(msg)
 			}
 			return nil
 		},
