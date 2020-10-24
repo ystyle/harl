@@ -2,6 +2,7 @@
 > 鸿蒙应用开发实机热更新工具
 
 ### 依赖
+- debug 版本的hi3516镜像(release版本不支持shell)
 - nfs v3
   - [配置过程](https://openharmony.gitee.com/openharmony/docs/blob/master/kernel/NFS.md)
   - [配置过程可能遇到的问题](https://openharmony.gitee.com/openharmony/docs/issues/I1YIBO)
@@ -40,7 +41,8 @@ GLOBAL OPTIONS:
 - [下载应用](https://gitee.com/ystyle/harl/releases)
 - `cd /your-project-dir` 切换到项目目录
 - `harl init` 初始化配置文件
-- `harl w` 监听项目文件修改, 可以输入命令(若看不到提示符请在高度日志暂停打印时按回车)
+- `harl w` 监听项目文件修改
+  - 监听时支持输入命令, 若看不到提示符请在调试日志暂停打印时按回车
 - 目前命令只支持在项目目录执行
 
 ### 配置文件
