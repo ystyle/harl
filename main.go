@@ -51,7 +51,7 @@ func main() {
 			return nil
 		},
 	}
-	app.Version = "v0.1.1"
+	app.Version = "v0.1.2"
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
