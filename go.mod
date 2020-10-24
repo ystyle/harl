@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/buger/jsonparser v1.0.0
+	github.com/gorilla/websocket v1.4.2
 	github.com/radovskyb/watcher v1.0.7
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
 	github.com/urfave/cli/v2 v2.2.0

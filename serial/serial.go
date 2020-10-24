@@ -1,13 +1,11 @@
 package serial
 
 import (
+	"errors"
 	"fmt"
 	"github.com/tarm/serial"
 	"io"
 	"log"
-	"os"
-	"strings"
-	"time"
 )
 
 type Serial struct {
@@ -25,49 +23,33 @@ func New(com string) *Serial {
 	handle := &Serial{
 		port: s,
 	}
-	go handle.read()
 	return handle
 }
 
-func (s *Serial) read() {
+func (s *Serial) IsConnected() error {
+	s.port.Write([]byte("\n"))
 	buffer := make([]byte, 1024)
-	for {
-		n, err := s.port.Read(buffer)
-		if err == io.EOF {
-			continue
-		}
-		serverMsg := string(buffer[0:n])
-		fmt.Print(serverMsg)
-		if !s.started && strings.HasSuffix(serverMsg, "OHOS # ") {
-			s.started = true
-			fmt.Println("serial: connected.")
-			return
-		}
-		if serverMsg == "bye" {
-			os.Exit(0)
-		}
+	n, err := s.port.Read(buffer)
+	if err == io.EOF {
+		return err
 	}
+	serverMsg := string(buffer[0:n])
+	if serverMsg == "bye" {
+		return errors.New("connection failed")
+	}
+	return nil
 }
 
-func (s *Serial) Send(msg string) {
-	fmt.Println("执行命令: ", msg)
-	s.port.Write([]byte(fmt.Sprintf("%s \n", msg)))
+func (s *Serial) Send(msg []byte) {
+	command := fmt.Sprintf("%s \n", msg)
+	s.port.Write([]byte(command))
+}
+
+func (s *Serial) Read() ([]byte, error) {
 	buffer := make([]byte, 1024)
-	for {
-		n, err := s.port.Read(buffer)
-		if err == io.EOF {
-			fmt.Print("\n")
-			break
-		}
-		serverMsg := string(buffer[0:n])
-		//fmt.Print(serverMsg)
-		if strings.Contains(serverMsg, "OHOS # ") {
-			break
-		}
-		if n < 1024 {
-			break
-		}
+	n, err := s.port.Read(buffer)
+	if err == io.EOF {
+		return nil, err
 	}
-	time.Sleep(time.Millisecond * 500)
-	fmt.Println("-------------------------------------------")
+	return buffer[0:n], nil
 }
