@@ -73,6 +73,12 @@ command: # 定义常用命令, 在shell或watch里可执行
     - dhclient eth0 # 命令一行一个, 顺序执行错误不会中断
     - mkdir /nfs
     - mount 192.168.3.12:/nfsshare /nfs nfs
+  kill: # 关闭应用
+    - cd /nfs
+    - ./aa terminate -p top.ystyle.ohos.js.testapp
+  start: # 启动应用
+    - cd /nfs
+    - ./aa start -p top.ystyle.ohos.js.testapp -n default
 ```
 
 ### 支持情况
