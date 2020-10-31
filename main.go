@@ -60,7 +60,7 @@ func main() {
 			return nil
 		},
 	}
-	app.Version = "v0.2.0"
+	app.Version = "v0.2.1"
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
@@ -187,7 +187,7 @@ func watch() *cli.Command {
 						form := event.Data["bin"]
 
 						hap := fmt.Sprintf("%s-%s.hap", bundleName, t)
-						utils.Copy(path.Join(config.Watch.Project, form), path.Join(config.Nfs.Ldir, hap))
+						utils.Copy(form, path.Join(config.Nfs.Ldir, hap))
 						// install
 						fmt.Println("install...")
 						send(fmt.Sprintf("cd %s", config.Nfs.Rdir))
