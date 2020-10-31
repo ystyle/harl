@@ -7,37 +7,45 @@ import (
 )
 
 type Config struct {
-	Build  *Build
-	Reload *Reload
+	Watch   *Watch
+	Nfs     *Nfs
+	Shell   *Shell
+	Command map[string][]string `yaml:"command,omitempty"`
+}
+
+type Watch struct {
+	Project  string `yaml:"-"`
+	Excludes []string
+	Includes []string
+	Delay    int
+}
+
+type Nfs struct {
+	Ldir string
+	Rdir string
+}
+
+type Shell struct {
+	Com string
 }
 
 type Build struct {
-	Project   string `yaml:"-"`
-	BuildType string
-	Excludes  []string
-	Includes  []string
-	Nfsdir    string
-	Delay     int
-}
-
-type Reload struct {
-	Dir string
-	//Telnet      string
-	Com         string
-	BundleName  string
-	AbilityName string
+	Nfsdir string
 }
 
 func (config Config) setDefault() {
-	if config.Build.Delay <= 50 {
-		config.Build.Delay = 100
+	if config.Watch.Delay <= 50 {
+		config.Watch.Delay = 100
 	}
-	if config.Build.Project == "" {
+	if config.Watch.Project == "" {
 		wd, err := os.Getwd()
 		if err != nil {
 			panic(err)
 		}
-		config.Build.Project = wd
+		config.Watch.Project = wd
+	}
+	if config.Command == nil {
+		config.Command = make(map[string][]string)
 	}
 }
 

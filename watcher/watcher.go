@@ -14,10 +14,10 @@ import (
 type FileWatch struct {
 	W      *watcher.Watcher
 	Event  chan model.Envent
-	config model.Config
+	config *model.Watch
 }
 
-func New(config model.Config) *FileWatch {
+func New(config *model.Watch) *FileWatch {
 	return &FileWatch{
 		W:      watcher.New(),
 		config: config,
@@ -37,7 +37,7 @@ func (fw *FileWatch) Watcher() {
 				if event.IsDir() {
 					continue
 				}
-				if !utils.IncludesString(fw.config.Build.Includes, path.Ext(event.Path)) {
+				if !utils.IncludesString(fw.config.Includes, path.Ext(event.Path)) {
 					continue
 				}
 				if strings.HasSuffix(event.Path, ".hap") {
@@ -60,12 +60,12 @@ func (fw *FileWatch) Watcher() {
 		}
 	}()
 	// Watch test_folder recursively for changes.
-	if err := w.AddRecursive(fw.config.Build.Project); err != nil {
+	if err := w.AddRecursive(fw.config.Project); err != nil {
 		log.Fatalln(err)
 	}
 
-	for _, exclude := range fw.config.Build.Excludes {
-		err := w.Ignore(fmt.Sprintf("%s/%s", fw.config.Build.Project, exclude))
+	for _, exclude := range fw.config.Excludes {
+		err := w.Ignore(fmt.Sprintf("%s/%s", fw.config.Project, exclude))
 		if err != nil {
 			fmt.Errorf("exclude files error: %w", err)
 		}
@@ -73,7 +73,7 @@ func (fw *FileWatch) Watcher() {
 
 	w.IgnoreHiddenFiles(true)
 
-	delay, _ := time.ParseDuration(fmt.Sprintf("%dms", fw.config.Build.Delay))
+	delay, _ := time.ParseDuration(fmt.Sprintf("%dms", fw.config.Delay))
 	// Start the watching process - it'll check for changes every 100ms.
 	if err := w.Start(delay); err != nil {
 		log.Fatalln(err)
