@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"github.com/buger/jsonparser"
 	"github.com/urfave/cli/v2"
@@ -50,6 +51,8 @@ func main() {
 			watch(),
 			install(),
 			uninstall(),
+			push(),
+			pull(),
 			shell(),
 			reboot(),
 		},
@@ -60,7 +63,7 @@ func main() {
 			return nil
 		},
 	}
-	app.Version = "v0.2.1"
+	app.Version = "v0.2.2.rc"
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
@@ -167,38 +170,32 @@ func watch() *cli.Command {
 				}
 			}()
 			go ReadLineAndExec()
+			var (
+				ctx    context.Context
+				cannel context.CancelFunc
+			)
 			for {
 				select {
 				case event := <-w.Event:
 					switch event.Action {
 					case "build":
 						fmt.Println("build ...")
-						err := utils.Run(path.Join(config.Watch.Project, "gradlew.bat"), "assembleDebug")
+						if ctx != nil {
+							cannel()
+						}
+						ctx, cannel = context.WithCancel(context.Background())
+						err := utils.Run(ctx, path.Join(config.Watch.Project, "gradlew.bat"), "assembleDebug")
 						if err != nil {
-							fmt.Println("build failed.")
+							fmt.Println("build failed: ", err.Error())
 						} else {
 							fmt.Println("build finished.")
 						}
 					case "reload":
-						fmt.Println("reload...")
-						t := time.Now().Format("20060102-150405")
-						// copy to nfs dir
-						fmt.Println("copy file to nfs ...")
-						form := event.Data["bin"]
-
-						hap := fmt.Sprintf("%s-%s.hap", bundleName, t)
-						utils.Copy(form, path.Join(config.Nfs.Ldir, hap))
-						// install
-						fmt.Println("install...")
-						send(fmt.Sprintf("cd %s", config.Nfs.Rdir))
-						send(fmt.Sprintf("./bm set -s disable"))
-						send(fmt.Sprintf("./bm set -d enable"))
-						time.Sleep(time.Second * 1)
-						send(fmt.Sprintf("./bm install -p %s", hap))
-						// start app
-						fmt.Println("start...")
-						time.Sleep(time.Second * 3)
-						send(fmt.Sprintf("./aa start -p %s -n %s", bundleName, abilityName))
+						if ctx != nil {
+							cannel()
+						}
+						ctx, cannel = context.WithCancel(context.Background())
+						go Install(ctx, event)
 					default:
 						fmt.Println("unknow operation", event)
 					}
@@ -206,6 +203,34 @@ func watch() *cli.Command {
 			}
 			return nil
 		},
+	}
+}
+
+func Install(ctx context.Context, event model.Envent) {
+	fmt.Println("reload...")
+	select {
+	case <-ctx.Done():
+		fmt.Println("Cancel install")
+		return
+	default:
+		t := time.Now().Format("20060102-150405")
+		// copy to nfs dir
+		fmt.Println("copy file to nfs ...")
+		form := event.Data["bin"]
+
+		hap := fmt.Sprintf("%s-%s.hap", bundleName, t)
+		utils.Copy(form, path.Join(config.Nfs.Ldir, hap))
+		// install
+		fmt.Println("install...")
+		send(fmt.Sprintf("cd %s", config.Nfs.Rdir))
+		send(fmt.Sprintf("./bm set -s disable"))
+		send(fmt.Sprintf("./bm set -d enable"))
+		time.Sleep(time.Second * 1)
+		send(fmt.Sprintf("./bm install -p %s", hap))
+		// start app
+		fmt.Println("start...")
+		time.Sleep(time.Second * 3)
+		send(fmt.Sprintf("./aa start -p %s -n %s", bundleName, abilityName))
 	}
 }
 
@@ -243,6 +268,7 @@ func ReadLineAndExec() {
 		if msg == "quit" {
 			os.Exit(0)
 		}
+		fmt.Printf("\x1b[1A\x1b[7C\x1b[K")
 		if strings.HasPrefix(msg, "^run ") {
 			commandType := strings.Replace(msg, "^run ", "", -1)
 			commandType = strings.TrimSpace(commandType)
@@ -254,7 +280,7 @@ func ReadLineAndExec() {
 			}
 			continue
 		}
-		s.Send(msg)
+		s.Send(string(line))
 	}
 }
 
@@ -301,6 +327,49 @@ func uninstall() *cli.Command {
 			cmd := fmt.Sprintf("cd %s", config.Nfs.Rdir)
 			send(cmd)
 			send(fmt.Sprintf("./bm uninstall -n %s", c.Args().First()))
+			return nil
+		},
+	}
+}
+
+func push() *cli.Command {
+	return &cli.Command{
+		Name:  "push",
+		Usage: "push localfile remotepath",
+		Action: func(c *cli.Context) error {
+			// copy to nfs
+			form := c.Args().First()
+			ldir := path.Join(config.Nfs.Ldir, path.Base(form))
+			_, err := utils.Copy(form, ldir)
+			if err != nil {
+				return err
+			}
+			// copy to remote path
+			rdir := path.Join(config.Nfs.Rdir, path.Base(form))
+			to := c.Args().Get(c.NArg() - 1)
+			fmt.Printf("copy to %s\n", to)
+			send(fmt.Sprintf("cp %s %s", rdir, to))
+			return nil
+		},
+	}
+}
+
+func pull() *cli.Command {
+	return &cli.Command{
+		Name:  "pull",
+		Usage: "pull remotefile localfullpath",
+		Action: func(c *cli.Context) error {
+			// copy to nfs
+			form := c.Args().First()
+			rdir := path.Join(config.Nfs.Rdir, path.Base(form))
+			sendAndRead(fmt.Sprintf("cp %s %s", form, rdir))
+			// copy to local
+			to := c.Args().Get(c.NArg() - 1)
+			ldir := path.Join(config.Nfs.Ldir, path.Base(form))
+			_, err := utils.Copy(ldir, to)
+			if err != nil {
+				return err
+			}
 			return nil
 		},
 	}

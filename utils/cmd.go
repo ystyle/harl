@@ -1,12 +1,13 @@
 package utils
 
 import (
+	"context"
 	"os"
 	"os/exec"
 )
 
-func Run(command string, args ...string) error {
-	cmd := exec.Command(command, args...)
+func Run(ctx context.Context, command string, args ...string) error {
+	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
