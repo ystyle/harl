@@ -63,7 +63,7 @@ func main() {
 			return nil
 		},
 	}
-	app.Version = "v0.2.2.rc"
+	app.Version = "v0.2.2"
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
