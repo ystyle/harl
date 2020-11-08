@@ -14,7 +14,7 @@
 ### USAGE
 
 ```shell
-➜ harl.exe
+➜ harl
 NAME:
    harl - Open Harmony OS Dev tools
 
@@ -22,13 +22,15 @@ USAGE:
    harl.exe [global options] command [command options] [arguments...]
 
 VERSION:
-   v0.1.2
+   v0.2.2
 
 COMMANDS:
    init, i    init .harm.yml
    watch, w   watch and reload app
    install    install hap
    uninstall  uninstall hap
+   push       push localfile remotepath
+   pull       pull remotefile localfullpath
    shell      open a shell
    reboot     reboot
    help, h    Shows a list of commands or help for one command
